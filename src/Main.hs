@@ -17,30 +17,8 @@ data FichasOld = Fichas { color :: Color
                      , afuera :: [Unidad]
                      }
 
-                    --  blancasIniciales =
-                    --    Fichas
-                    --    { color = Blanca
-                    --    , enjuego = [ (Hacha, Coord { fila = F2, columna = C1})
-                    --                , (Hacha, Coord { fila = F3, columna = C2})
-                    --                , (Espada, Coord { fila = F2, columna = C3})
-                    --                , (Espada, Coord { fila = F3, columna = C4})
-                    --                , (Pica, Coord { fila = F1, columna = C5})
-                    --                , (Pica, Coord { fila = F2, columna = C6})
-                    --                , (Caballo, Coord { fila = F3, columna = C7})
-                    --                , (Caballo, Coord { fila = F2, columna = C1})
-                    --                , (Arco, Coord { fila = F2, columna = C3})
-                    --                , (Arco, Coord { fila = F3, columna = C4})
-                    --                , (Bufo, Coord { fila = F1, columna = C1})
-                    --                , (Bufo, Coord { fila = F2, columna = C5})
-                    --                , (Mago, Coord { fila = F1, columna = C4})
-                    --                , (Mago, Coord { fila = F3, columna = C8})
-                    --                , (Rey, Coord { fila = F2, columna = C1})
-                    --                ]
-                    --    , afuera = []
-                    --    }
-
 main :: IO ()
-main = putStr (showGame "abcdefghi")
+main = putStr (showBoard fichasEstado1)
 
 -- Unidades del Juego - 15 fichas
 unidades :: [Unidad]
@@ -52,6 +30,12 @@ fichasEstado1 :: [(Unidad,Color,Coord)]
 fichasEstado1 = [
    (Hacha, Blanca, Coord{ fila = F2, columna = C1})
  , (Hacha, Negra, Coord{ fila = F1, columna = C2})
+ , (Espada, Negra, Coord{ fila = F3, columna = C8})
+ , (Espada, Blanca, Coord{ fila = F4, columna = C2})
+ , (Rey, Negra, Coord{ fila = F5, columna = C7})
+ , (Rey, Negra, Coord{ fila = F6, columna = C2})
+ , (Bufo, Blanca, Coord{ fila = F7, columna = C4})
+ , (Mago, Negra, Coord{ fila = F8, columna = C5})
  ]
 
 extract3 :: (a, b, c) -> c
