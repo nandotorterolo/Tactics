@@ -22,21 +22,38 @@ main = putStr (showBoard fichasEstado1)
 
 -- Unidades del Juego - 15 fichas
 unidades :: [Unidad]
-unidades = [Hacha, Hacha, Espada, Espada, Pica, Pica, Caballo, Caballo, Arco, Arco, Bufo, Bufo, Mago, Mago, Rey]
+unidades = [Hacha, Espada, Pica, Caballo, Arco, Bufo, Mago, Rey]
 
--- 15 unidades blancas iniciales, hacer un algoritmo de como poner las fichas
--- type Fichas = [(Unidad,Color,Coord)]
-fichasEstado1 :: [(Unidad,Color,Coord)]
-fichasEstado1 = [
-   (Hacha, Blanca, Coord{ fila = F2, columna = C1})
- , (Hacha, Negra, Coord{ fila = F1, columna = C2})
- , (Espada, Negra, Coord{ fila = F3, columna = C8})
- , (Espada, Blanca, Coord{ fila = F4, columna = C2})
- , (Rey, Negra, Coord{ fila = F5, columna = C7})
- , (Rey, Negra, Coord{ fila = F6, columna = C2})
- , (Bufo, Blanca, Coord{ fila = F7, columna = C4})
- , (Mago, Negra, Coord{ fila = F8, columna = C5})
- ]
+--Devuelve los enemigos de una unidad, verificar el color opuesto
+gana :: Unidad -> [Unidad]
+gana uni
+ | uni == Hacha = [Arco, Bufo, Mago]
+ | uni == Espada = [Hacha, Bufo, Mago]
+ | uni == Pica = [Hacha, Espada, Caballo]
+ | uni == Caballo = [Hacha, Espada, Arco]
+ | uni == Arco = [Espada, Pica, Bufo]
+ | uni == Bufo = [Pica, Caballo, Mago]
+ | uni == Mago = [Pica, Caballo, Arco]
+ | otherwise = unidades --rey
+
+pierde :: Unidad -> [Unidad]
+pierde uni
+ | uni == Hacha = [Espada, Pica, Caballo]
+ | uni == Espada = [Pica, Caballo, Arco]
+ | uni == Pica = [Arco, Bufo, Mago]
+ | uni == Caballo = [Pica, Bufo, Mago]
+ | uni == Arco = [Hacha,Caballo, Mago]
+ | uni == Bufo = [Hacha,Espada, Arco]
+ | uni == Mago = [Hacha, Espada, Arco]
+ | otherwise = unidades --rey
+
+colorGana :: (Color, Unidad) -> (Color,[Unidad])
+colorGana (Negra, uni) = (Blanca, gana uni)
+colorGana (Blanca, uni) = (Negra, gana uni)
+
+colorPierde :: (Color,Unidad) -> (Color,[Unidad])
+colorPierde (Negra, uni) = (Blanca, pierde uni)
+colorPierde (Blanca, uni) = (Negra, pierde uni)
 
 extract3 :: (a, b, c) -> c
 extract3 (_,_,c) = c
@@ -71,7 +88,7 @@ fichaStr (Mago,Negra) = 'm'
 fichaStr (Rey,Blanca) = 'R'
 fichaStr (Rey,Negra) = 'r'
 
-
+--putStr (showBoard fichasEstado1)
 showBoard :: [(Unidad,Color,Coord)] -> String
 showBoard fichas =
  emptyRow ++
@@ -100,23 +117,18 @@ row2  f fichas = [[fichaStrPocision fichas Coord{ fila = f, columna = C1}],
          [fichaStrPocision fichas Coord{ fila = f, columna = C7}],
          [fichaStrPocision fichas Coord{ fila = f, columna = C8}]]
 
--- format a game board for on-screen printing
--- La informacion que se le pase a esta funcion es la impresa en el tablero
-showGame :: String -> String
-showGame [a,b,c,d,e,f,g,h,i] =
- emptyRow ++
- "|    | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n" ++
- emptyRow ++
- row "1" [[a],[b],[c]] ++
- row "2" [[d],[e],[f]] ++
- row "3" [[g],[h],[i]] ++
- row "4" [[a],[b],[c]] ++
- row "5" [[d],[e],[f]] ++
- row "6" [[g],[h],[i]] ++
- row "7" [[d],[e],[f]] ++
- row "8" [[g],[h],[i]]
- where
-  emptyRow = "+----+---+---+---+\n"
-  row n x = "| " ++ n ++ "  | " ++ intercalate " | " x ++ " |\n" ++ emptyRow
 
--- showGame :: [Unidad] -> [Unidad] -> String
+-- 15 unidades blancas iniciales, hacer un algoritmo de como poner las fichas
+-- llamar de esta forma, putStr (showBoard fichasEstado1)
+-- type Fichas = [(Unidad,Color,Coord)]
+fichasEstado1 :: [(Unidad,Color,Coord)]
+fichasEstado1 = [
+   (Hacha, Blanca, Coord{ fila = F2, columna = C1})
+ , (Hacha, Negra, Coord{ fila = F1, columna = C2})
+ , (Espada, Negra, Coord{ fila = F3, columna = C8})
+ , (Espada, Blanca, Coord{ fila = F4, columna = C2})
+ , (Rey, Negra, Coord{ fila = F5, columna = C7})
+ , (Rey, Negra, Coord{ fila = F6, columna = C2})
+ , (Bufo, Blanca, Coord{ fila = F7, columna = C4})
+ , (Mago, Negra, Coord{ fila = F8, columna = C5})
+ ]
