@@ -1,21 +1,16 @@
 module Main where
 
 import Data.List (intercalate)
-import Data.Array
 
-data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Show, Eq, Ord)
-data Col = C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8                             deriving (Show, Eq, Ord)
-data Color = Blanca | Negra                                                  deriving (Show, Eq, Ord)
-data Unidad = Rey| Mago | Bufo | Arco | Caballo | Pica | Espada | Hacha      deriving (Show, Eq, Ord)
+data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Eq,Ord,Enum)
+data Col = C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8                             deriving (Eq,Ord,Enum)
+data Color = Blanca | Negra                                                  deriving (Eq)
+data Unidad = Rey| Mago | Bufo | Arco | Caballo | Pica | Espada | Hacha      deriving (Eq)
+data Coordenada = Coord Fil Col                                              deriving (Eq)
 
-data Coord = Coord { fila :: Fil
-                   , columna :: Col
-                   }      deriving (Show, Eq, Ord)
-
-data FichasOld = Fichas { color :: Color
-                     , enjuego :: [(Unidad,Coord)]
-                     , afuera :: [Unidad]
-                     }
+type Ficha = (Unidad,Color)
+type FichaTablero = (Unidad,Color,Coordenada)
+type Tablero = [FichaTablero]
 
 main :: IO ()
 main = putStr (showBoard fichasEstado1)
@@ -24,28 +19,29 @@ main = putStr (showBoard fichasEstado1)
 unidades :: [Unidad]
 unidades = [Hacha, Espada, Pica, Caballo, Arco, Bufo, Mago, Rey]
 
---Devuelve los enemigos de una unidad, verificar el color opuesto
+--Devuelve lista de unidades que puede ganarle la una unidad dada
 gana :: Unidad -> [Unidad]
-gana uni
- | uni == Hacha = [Arco, Bufo, Mago]
- | uni == Espada = [Hacha, Bufo, Mago]
- | uni == Pica = [Hacha, Espada, Caballo]
- | uni == Caballo = [Hacha, Espada, Arco]
- | uni == Arco = [Espada, Pica, Bufo]
- | uni == Bufo = [Pica, Caballo, Mago]
- | uni == Mago = [Pica, Caballo, Arco]
- | otherwise = unidades --rey
+gana uni = case uni of
+  Hacha -> [Arco, Bufo, Mago]
+  Espada -> [Hacha, Bufo, Mago]
+  Pica -> [Hacha, Espada, Caballo]
+  Caballo -> [Hacha, Espada, Arco]
+  Arco -> [Espada, Pica, Bufo]
+  Bufo -> [Pica, Caballo, Mago]
+  Mago -> [Pica, Caballo, Arco]
+  _ -> unidades --rey
 
+--Devuelve lista de unidades que puede perder la una unidad dadapierde :: Unidad -> [Unidad]
 pierde :: Unidad -> [Unidad]
-pierde uni
- | uni == Hacha = [Espada, Pica, Caballo]
- | uni == Espada = [Pica, Caballo, Arco]
- | uni == Pica = [Arco, Bufo, Mago]
- | uni == Caballo = [Pica, Bufo, Mago]
- | uni == Arco = [Hacha,Caballo, Mago]
- | uni == Bufo = [Hacha,Espada, Arco]
- | uni == Mago = [Hacha, Espada, Arco]
- | otherwise = unidades --rey
+pierde uni = case uni of
+  Hacha -> [Espada, Pica, Caballo]
+  Espada -> [Pica, Caballo, Arco]
+  Pica -> [Arco, Bufo, Mago]
+  Caballo -> [Pica, Bufo, Mago]
+  Arco -> [Hacha,Caballo, Mago]
+  Bufo -> [Hacha,Espada, Arco]
+  Mago -> [Hacha, Espada, Arco]
+  _ -> unidades --rey
 
 colorGana :: (Color, Unidad) -> (Color,[Unidad])
 colorGana (Negra, uni) = (Blanca, gana uni)
@@ -55,22 +51,17 @@ colorPierde :: (Color,Unidad) -> (Color,[Unidad])
 colorPierde (Negra, uni) = (Blanca, pierde uni)
 colorPierde (Blanca, uni) = (Negra, pierde uni)
 
-extract3 :: (a, b, c) -> c
-extract3 (_,_,c) = c
+unidadFT :: FichaTablero -> Unidad
+unidadFT (unidad,_,_) = unidad
 
--- Busca una Unidad en posicion dada, deberia ser una lista de 1, o una [], TODO devolver un Maybe
-buscarPosicion :: [(Unidad,Color,Coord)] -> Coord -> [(Unidad,Color)]
-buscarPosicion fichas Coord{fila=f ,columna=c} =
-  map (\(u,c,_) -> (u,c)) (filter (\ficha -> extract3 ficha == Coord { fila = f, columna = c}) fichas)
+colorFT :: FichaTablero -> Color
+colorFT (_,color,_) = color
 
-fichaStrPocision :: [(Unidad,Color,Coord)] -> Coord -> Char
-fichaStrPocision fichas coord
-  | length lista  == 1 = fichaStr (head lista)
-  | null lista = ' '
-  where lista = buscarPosicion fichas coord
+coordenadaFT (_,_,coordenada) = coordenada
+coordenadaFT :: FichaTablero -> Coordenada
 
---Blancas son mayusculas, negras minusculas
-fichaStr ::(Unidad , Color) -> Char
+--Caracter asociado a cada Ficha, Blancas son mayusculas, negras minusculas
+fichaStr :: Ficha -> Char
 fichaStr (Hacha, Blanca) = 'H'
 fichaStr (Hacha, Negra) = 'h'
 fichaStr (Espada,Blanca) = 'E'
@@ -88,47 +79,70 @@ fichaStr (Mago,Negra) = 'm'
 fichaStr (Rey,Blanca) = 'R'
 fichaStr (Rey,Negra) = 'r'
 
+fichaMaybeStr :: Maybe Ficha -> Char
+fichaMaybeStr mFicha = case mFicha of
+  Just ficha -> fichaStr ficha
+  Nothing  -> ' '
+
 --putStr (showBoard fichasEstado1)
-showBoard :: [(Unidad,Color,Coord)] -> String
+showBoard :: [FichaTablero] -> String
 showBoard fichas =
  emptyRow ++
  "|    | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n" ++
  emptyRow ++
- row "1" (row2 F1 fichas) ++
- row "2" (row2 F2 fichas) ++
- row "3" (row2 F3 fichas) ++
- row "4" (row2 F4 fichas) ++
- row "5" (row2 F5 fichas) ++
- row "6" (row2 F6 fichas) ++
- row "7" (row2 F7 fichas) ++
- row "8" (row2 F8 fichas)
+ row "1" (cadena F1 fichas) ++
+ row "2" (cadena F2 fichas) ++
+ row "3" (cadena F3 fichas) ++
+ row "4" (cadena F4 fichas) ++
+ row "5" (cadena F5 fichas) ++
+ row "6" (cadena F6 fichas) ++
+ row "7" (cadena F7 fichas) ++
+ row "8" (cadena F8 fichas)
  where
   emptyRow = "+----+---+---+---+---+---+---+---+---+\n"
-  row n x = "| " ++ n ++ "  | " ++ intercalate " | " x ++ " |\n" ++ emptyRow
+  row rowNumber fichas = "| " ++ rowNumber ++ "  | " ++ intercalate " | " fichas ++ " |\n" ++ emptyRow
+
+-- Dado una fila y un tablero, devuelve los caracteres asociados a cada una de las fillas)
+-- ejemplo, Fila1 -> Tablero que tiene 2 reyes en las columnas 3,5,devuelve: [" "," ","R"," ","r"," "," "," "]
+-- < +----+---+---+---+---+---+---+---+---+
+-- < |    | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |  <- columnas
+-- < +----+---+---+---+---+---+---+---+---+
+-- < | 1  |   |  | R  |   | r  |   |   |   |
+-- < +----+---+---+---+---+---+---+---+---+
+cadena :: Fil -> Tablero -> [String]
+cadena f fichas =  map (\col -> [fichaStrPocision fichas (Coord f col)]) [C1 .. C8]
+
+-- Dado un tablero y una coordenada devuelve opcionalmente una ficha
+fichaCoordenada :: Tablero -> Coordenada -> Maybe Ficha
+fichaCoordenada tablero coord = if null listaFichas then Nothing else Just (head listaFichas)
+  where listaFichas = map (\(u,c,_) -> (u,c)) (filter (\ficha -> coordenadaFT ficha == coord) tablero)
+
+-- dado un tablero y una coordenada devuelve el carater asociado a la ficha a imprimir
+fichaStrPocision :: Tablero -> Coordenada -> Char
+fichaStrPocision tablero coord = fichaMaybeStr (fichaCoordenada tablero coord)
+
+-- Lista de coordenadas validas al inicio del juego para las blancas
+-- Filas 6..8, Columnas 1..8
+-- posisionesValidasBlancas :: [Coordenada]
 
 
-row2 :: Fil -> [(Unidad,Color,Coord)] -> [[Char]]
-row2  f fichas = [[fichaStrPocision fichas Coord{ fila = f, columna = C1}],
-         [fichaStrPocision fichas Coord{ fila = f, columna = C2}],
-         [fichaStrPocision fichas Coord{ fila = f, columna = C3}],
-         [fichaStrPocision fichas Coord{ fila = f, columna = C4}],
-         [fichaStrPocision fichas Coord{ fila = f, columna = C5}],
-         [fichaStrPocision fichas Coord{ fila = f, columna = C6}],
-         [fichaStrPocision fichas Coord{ fila = f, columna = C7}],
-         [fichaStrPocision fichas Coord{ fila = f, columna = C8}]]
+-- Lista de coordenadas validas al inicio del juego para las negras
+-- Filas 6..8, Columnas 1..8
+-- posisionesValidasNegras :: [Coordenada]
 
 
 -- 15 unidades blancas iniciales, hacer un algoritmo de como poner las fichas
 -- llamar de esta forma, putStr (showBoard fichasEstado1)
 -- type Fichas = [(Unidad,Color,Coord)]
-fichasEstado1 :: [(Unidad,Color,Coord)]
+-- TODO hacer muchos tableros iniciales, pero solo de un color, para que jueguen
+fichasEstado1 :: Tablero
 fichasEstado1 = [
-   (Hacha, Blanca, Coord{ fila = F2, columna = C1})
- , (Hacha, Negra, Coord{ fila = F1, columna = C2})
- , (Espada, Negra, Coord{ fila = F3, columna = C8})
- , (Espada, Blanca, Coord{ fila = F4, columna = C2})
- , (Rey, Negra, Coord{ fila = F5, columna = C7})
- , (Rey, Negra, Coord{ fila = F6, columna = C2})
- , (Bufo, Blanca, Coord{ fila = F7, columna = C4})
- , (Mago, Negra, Coord{ fila = F8, columna = C5})
+   (Hacha, Blanca, Coord F2 C1)
+ , (Hacha, Negra, Coord F1 C2)
+ , (Espada, Negra, Coord F3 C8)
+ , (Espada, Blanca, Coord F4 C2)
+ , (Rey, Negra, Coord F5 C7)
+ , (Rey, Negra, Coord F6 C2)
+ , (Bufo, Blanca, Coord F7 C4)
+ , (Mago, Negra, Coord F8 C5)
  ]
