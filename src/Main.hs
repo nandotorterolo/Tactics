@@ -1,6 +1,8 @@
 module Main where
 
 import Data.List (intercalate)
+import Data.Maybe (isNothing)
+import Control.Arrow ((&&&))
 
 data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Eq,Ord,Enum)
 data Col = C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8                             deriving (Eq,Ord,Enum)
@@ -31,7 +33,7 @@ gana uni = case uni of
   Mago -> [Pica, Caballo, Arco]
   _ -> unidades --rey
 
---Devuelve lista de unidades que puede perder la una unidad dadapierde :: Unidad -> [Unidad]
+--Devuelve lista de unidades que puede perder la una unidad dada
 pierde :: Unidad -> [Unidad]
 pierde uni = case uni of
   Hacha -> [Espada, Pica, Caballo]
@@ -43,13 +45,13 @@ pierde uni = case uni of
   Mago -> [Hacha, Espada, Arco]
   _ -> unidades --rey
 
-colorGana :: (Color, Unidad) -> (Color,[Unidad])
-colorGana (Negra, uni) = (Blanca, gana uni)
-colorGana (Blanca, uni) = (Negra, gana uni)
+colorGana :: Ficha -> (Color,[Unidad])
+colorGana (unidad, Negra) = (Blanca, gana unidad)
+colorGana (unidad, Blanca) = (Negra, gana unidad)
 
-colorPierde :: (Color,Unidad) -> (Color,[Unidad])
-colorPierde (Negra, uni) = (Blanca, pierde uni)
-colorPierde (Blanca, uni) = (Negra, pierde uni)
+colorPierde :: Ficha -> (Color,[Unidad])
+colorPierde (unidad, Negra) = (Blanca, pierde unidad)
+colorPierde (unidad, Blanca) = (Negra, pierde unidad)
 
 unidadFT :: FichaTablero -> Unidad
 unidadFT (unidad,_,_) = unidad
@@ -84,8 +86,9 @@ fichaMaybeStr mFicha = case mFicha of
   Just ficha -> fichaStr ficha
   Nothing  -> ' '
 
---putStr (showBoard fichasEstado1)
-showBoard :: [FichaTablero] -> String
+-- Imprime un tablero
+-- putStr (showBoard fichasEstado1)
+showBoard :: Tablero -> String
 showBoard fichas =
  emptyRow ++
  "|    | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n" ++
@@ -112,23 +115,32 @@ showBoard fichas =
 cadena :: Fil -> Tablero -> [String]
 cadena f fichas =  map (\col -> [fichaStrPocision fichas (Coord f col)]) [C1 .. C8]
 
--- Dado un tablero y una coordenada devuelve opcionalmente una ficha
-fichaCoordenada :: Tablero -> Coordenada -> Maybe Ficha
-fichaCoordenada tablero coord = if null listaFichas then Nothing else Just (head listaFichas)
-  where listaFichas = map (\(u,c,_) -> (u,c)) (filter (\ficha -> coordenadaFT ficha == coord) tablero)
-
 -- dado un tablero y una coordenada devuelve el carater asociado a la ficha a imprimir
 fichaStrPocision :: Tablero -> Coordenada -> Char
 fichaStrPocision tablero coord = fichaMaybeStr (fichaCoordenada tablero coord)
 
--- Lista de coordenadas validas al inicio del juego para las blancas
--- Filas 6..8, Columnas 1..8
--- posisionesValidasBlancas :: [Coordenada]
+-- Predicado para ocupacion de posicion.
+estaOcupado :: Tablero -> Coordenada -> Bool
+estaOcupado tablero coord = isNothing (fichaCoordenada tablero coord)
 
+-- Dado un tablero y una coordenada devuelve opcionalmente una ficha
+-- En la funcion where se utiliza Arrow &&&, la forma clasico seri la linea de abajo.
+-- where listaFichas = map (\ ft -> (unidadFT ft, colorFT ft)) (filter (\ficha -> coordenadaFT ficha == coord) tablero)
+-- https://en.wikibooks.org/wiki/Haskell/Understanding_arrows
+fichaCoordenada :: Tablero -> Coordenada -> Maybe Ficha
+fichaCoordenada tablero coord =
+  if null listaFichas
+    then Nothing
+    else Just (head listaFichas) -- la lista deberia tener solo un elemento
+  where listaFichas = map (unidadFT &&& colorFT) (filter (\ficha -> coordenadaFT ficha == coord) tablero)
 
 -- Lista de coordenadas validas al inicio del juego para las negras
--- Filas 6..8, Columnas 1..8
--- posisionesValidasNegras :: [Coordenada]
+posisionesValidasNegras :: [Coordenada]
+posisionesValidasNegras = [Coord f c | f <- [F1 .. F3], c<- [C1 .. C8]]
+
+-- Lista de coordenadas validas al inicio del juego para las blancas
+posisionesValidasBlancas :: [Coordenada]
+posisionesValidasBlancas = [Coord f c | f <- [F6 .. F8],  c <- [C1 .. C8]]
 
 
 -- 15 unidades blancas iniciales, hacer un algoritmo de como poner las fichas
