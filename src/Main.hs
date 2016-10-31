@@ -18,7 +18,7 @@ type FichaTablero = (Unidad,Color,Coordenada)
 type Tablero = [FichaTablero]
 
 main :: IO ()
-main = putStr (showBoard fichasEstado1)
+main = showIOBoard (crearTableroCompleto todasLasUnidades []) >>= putStr
 
 -- Unidades del Juego - 15 fichas
 unidades :: [Unidad]
