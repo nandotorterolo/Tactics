@@ -3,13 +3,16 @@ module Main where
 import Data.List (intercalate)
 import Data.Maybe (isNothing)
 import Control.Arrow ((&&&))
+import System.Random
 
+data Player = PlayerWhite | PlayerBlack                                      deriving (Eq, Show, Enum)
 data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Eq,Ord,Enum)
-data Col = C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8                             deriving (Eq,Ord,Enum)
+data Col = CA | CB | CC | CD | CE | CF | CG | CH                             deriving (Eq,Ord,Enum)
 data Color = Blanca | Negra                                                  deriving (Eq)
 data Unidad = Rey| Mago | Bufo | Arco | Caballo | Pica | Espada | Hacha      deriving (Eq)
 data Coordenada = Coord Fil Col                                              deriving (Eq)
 
+type GameState = (Tablero,Int,Player)
 type Ficha = (Unidad,Color)
 type FichaTablero = (Unidad,Color,Coordenada)
 type Tablero = [FichaTablero]
@@ -91,7 +94,7 @@ fichaMaybeStr mFicha = case mFicha of
 showBoard :: Tablero -> String
 showBoard fichas =
  emptyRow ++
- "|    | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n" ++
+ "|    | A | B | C | D | E | F | G | H |\n" ++
  emptyRow ++
  row "1" (cadena F1 fichas) ++
  row "2" (cadena F2 fichas) ++
@@ -105,6 +108,12 @@ showBoard fichas =
   emptyRow = "+----+---+---+---+---+---+---+---+---+\n"
   row rowNumber fichas = "| " ++ rowNumber ++ "  | " ++ intercalate " | " fichas ++ " |\n" ++ emptyRow
 
+showIOBoard :: IO Tablero -> IO String
+showIOBoard fichas = 
+  do 
+    tablero <- fichas
+    return (showBoard tablero)
+
 -- Dado una fila y un tablero, devuelve los caracteres asociados a cada una de las fillas)
 -- ejemplo, Fila1 -> Tablero que tiene 2 reyes en las columnas 3,5,devuelve: [" "," ","R"," ","r"," "," "," "]
 -- < +----+---+---+---+---+---+---+---+---+
@@ -113,15 +122,15 @@ showBoard fichas =
 -- < | 1  |   |  | R  |   | r  |   |   |   |
 -- < +----+---+---+---+---+---+---+---+---+
 cadena :: Fil -> Tablero -> [String]
-cadena f fichas =  map (\col -> [fichaStrPocision fichas (Coord f col)]) [C1 .. C8]
+cadena f fichas =  map (\col -> [fichaStrPosicion fichas (Coord f col)]) [CA .. CH]
 
 -- dado un tablero y una coordenada devuelve el carater asociado a la ficha a imprimir
-fichaStrPocision :: Tablero -> Coordenada -> Char
-fichaStrPocision tablero coord = fichaMaybeStr (fichaCoordenada tablero coord)
+fichaStrPosicion :: Tablero -> Coordenada -> Char
+fichaStrPosicion tablero coord = fichaMaybeStr (fichaCoordenada tablero coord)
 
 -- Predicado para ocupacion de posicion.
-estaOcupado :: Tablero -> Coordenada -> Bool
-estaOcupado tablero coord = isNothing (fichaCoordenada tablero coord)
+estaLibre :: Tablero -> Coordenada -> Bool
+estaLibre tablero coord = isNothing (fichaCoordenada tablero coord)
 
 -- Dado un tablero y una coordenada devuelve opcionalmente una ficha
 -- En la funcion where se utiliza Arrow &&&, la forma clasico seri la linea de abajo.
@@ -135,26 +144,64 @@ fichaCoordenada tablero coord =
   where listaFichas = map (unidadFT &&& colorFT) (filter (\ficha -> coordenadaFT ficha == coord) tablero)
 
 -- Lista de coordenadas validas al inicio del juego para las negras
-posisionesValidasNegras :: [Coordenada]
-posisionesValidasNegras = [Coord f c | f <- [F1 .. F3], c<- [C1 .. C8]]
+posicionesValidasNegrasLibres :: Tablero -> [Coordenada]
+posicionesValidasNegrasLibres t = [c | c <- posicionesValidasNegras, estaLibre t c]
+
+posicionesValidasNegras :: [Coordenada]
+posicionesValidasNegras = [Coord f c | f <- [F1 .. F3], c<- [CA .. CH], not (elem (Coord f c) posicionesReyNegro)]
+
+posicionesReyNegro :: [Coordenada]
+posicionesReyNegro = [Coord F1 CD, Coord F1 CE, Coord F2 CD, Coord F2 CE]
 
 -- Lista de coordenadas validas al inicio del juego para las blancas
-posisionesValidasBlancas :: [Coordenada]
-posisionesValidasBlancas = [Coord f c | f <- [F6 .. F8],  c <- [C1 .. C8]]
+posicionesValidasBlancasLibres :: Tablero -> [Coordenada]
+posicionesValidasBlancasLibres t = [c | c <- posicionesValidasBlancas, estaLibre t c]
 
+posicionesValidasBlancas :: [Coordenada]
+posicionesValidasBlancas = [Coord f c | f <- [F6 .. F8],  c <- [CA .. CH], not (elem (Coord f c) posicionesReyBlanco)]
 
--- 15 unidades blancas iniciales, hacer un algoritmo de como poner las fichas
--- llamar de esta forma, putStr (showBoard fichasEstado1)
--- type Fichas = [(Unidad,Color,Coord)]
--- TODO hacer muchos tableros iniciales, pero solo de un color, para que jueguen
-fichasEstado1 :: Tablero
-fichasEstado1 = [
-   (Hacha, Blanca, Coord F2 C1)
- , (Hacha, Negra, Coord F1 C2)
- , (Espada, Negra, Coord F3 C8)
- , (Espada, Blanca, Coord F4 C2)
- , (Rey, Negra, Coord F5 C7)
- , (Rey, Negra, Coord F6 C2)
- , (Bufo, Blanca, Coord F7 C4)
- , (Mago, Negra, Coord F8 C5)
- ]
+posicionesReyBlanco :: [Coordenada]
+posicionesReyBlanco = [Coord F7 CD, Coord F7 CE, Coord F8 CD, Coord F8 CE]
+
+-- Utilidades
+obtenerElementoRandomico :: [a] -> IO a
+obtenerElementoRandomico xs = do
+  n <- randomRIO (0, (length xs) - 1)
+  return $ xs !! n
+
+-- showIOBoard (posicionarFichaRandomico (Rey, Blanca) []) >>= putStr
+-- showIOBoard (posicionarFichaRandomico (Hacha, Blanca) []) >>= putStr
+posicionarFichaRandomico :: Ficha -> Tablero -> IO Tablero
+posicionarFichaRandomico (Rey, Blanca) t = 
+  do
+    posicion <- obtenerElementoRandomico posicionesReyBlanco
+    return ((Rey, Blanca, posicion) : t)
+
+posicionarFichaRandomico (Rey, Negra) t = 
+  do
+    posicion <- obtenerElementoRandomico posicionesReyNegro
+    return ((Rey, Negra, posicion) : t)
+
+posicionarFichaRandomico (u, Blanca) t = 
+  do
+    posicion <- obtenerElementoRandomico (posicionesValidasBlancasLibres t)
+    return ((u, Blanca, posicion) : t)
+
+posicionarFichaRandomico (u, Negra) t = 
+  do
+    posicion <- obtenerElementoRandomico (posicionesValidasNegrasLibres t)
+    return ((u, Negra, posicion) : t)
+
+todasLasUnidades :: [Ficha]
+todasLasUnidades = [
+  (Hacha,Blanca), (Hacha,Blanca), (Espada,Blanca), (Espada,Blanca), (Pica,Blanca), (Pica,Blanca), (Caballo,Blanca), (Caballo,Blanca), (Arco,Blanca), (Arco,Blanca), (Bufo,Blanca), (Bufo,Blanca), (Mago,Blanca), (Mago,Blanca), (Rey,Blanca),
+  (Hacha,Negra), (Hacha,Negra), (Espada,Negra), (Espada,Negra), (Pica,Negra), (Pica,Negra), (Caballo,Negra), (Caballo,Negra), (Arco,Negra), (Arco,Negra), (Bufo,Negra), (Bufo,Negra), (Mago,Negra), (Mago,Negra), (Rey,Negra)
+  ]
+
+-- showIOBoard (crearTableroCompleto todasLasUnidades []) >>= putStr
+crearTableroCompleto :: [Ficha] -> Tablero -> IO Tablero
+crearTableroCompleto [] t = return t
+crearTableroCompleto (ficha:xs) t =
+  do
+    tablero <- posicionarFichaRandomico ficha t
+    crearTableroCompleto xs tablero
