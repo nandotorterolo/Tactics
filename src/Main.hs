@@ -7,8 +7,8 @@ import System.Random
 
 data Player = PlayerWhite | PlayerBlack                                      deriving (Eq, Show, Enum)
 data GameStatus = Turn Player | Roll Player | Finished                       deriving (Eq, Show)
--- Tablero, NroTurno,JugadorActivo, dado1,dado2
-data GameState = GameState Tablero Int Player (Int,Int)                      deriving (Eq) --TODO
+-- Tablero, NroTurno,JugadorActivo, sumaDados, cargaHabilitada
+data GameState = GameState Tablero Int Player Int Bool                      deriving (Eq) --TODO
 data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada | Pasar    deriving (Eq) --TODO
 
 data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Eq,Ord,Enum, Show)
@@ -53,13 +53,13 @@ pierde uni = case uni of
   Mago -> [Hacha, Espada, Arco]
   _ -> unidades --rey
 
-colorGana :: Ficha -> (Color,[Unidad])
-colorGana (unidad, Negra) = (Blanca, gana unidad)
-colorGana (unidad, Blanca) = (Negra, gana unidad)
+colorGana :: Ficha -> [Ficha]
+colorGana (unidad, Negra) =  map (\u -> (u, Blanca)) (gana unidad)
+colorGana (unidad, Blanca) = map (\u ->(u, Negra)) (gana unidad)
 
-colorPierde :: Ficha -> (Color,[Unidad])
-colorPierde (unidad, Negra) = (Blanca, pierde unidad)
-colorPierde (unidad, Blanca) = (Negra, pierde unidad)
+colorPierde :: Ficha -> [Ficha]
+colorPierde (unidad, Negra) = map (\u -> (u, Blanca)) (pierde unidad)
+colorPierde (unidad, Blanca) = map (\u ->(u, Negra)) (pierde unidad)
 
 unidadFT :: FichaTablero -> Unidad
 unidadFT (unidad,_,_) = unidad
@@ -137,6 +137,13 @@ fichaStrPosicion tablero coord = fichaMaybeStr (fichaCoordenada tablero coord)
 estaLibre :: Tablero -> Coordenada -> Bool
 estaLibre tablero coord = isNothing (fichaCoordenada tablero coord)
 
+puedeIr :: Tablero -> Ficha -> Coordenada -> Bool
+puedeIr t ficha c = resultado
+  where
+    resultado = case fichaCoordenada t c of
+      Nothing -> True
+      Just f@(uni,col) -> f `elem` colorPierde ficha
+
 -- Dado un tablero y una coordenada devuelve opcionalmente una ficha
 -- En la funcion where se utiliza Arrow &&&, la forma clasico seri la linea de abajo.
 -- where listaFichas = map (\ ft -> (unidadFT ft, colorFT ft)) (filter (\ficha -> coordenadaFT ficha == coord) tablero)
@@ -210,29 +217,37 @@ crearTableroCompleto (ficha:xs) t =
 estoyEncarga :: (Int,Int) -> Bool
 estoyEncarga (a,b) = a==b
 
--- data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Eq,Ord,Enum)
--- data Col = CA | CB | CC | CD | CE | CF | CG | CH                             deriving (Eq,Ord,Enum)
-
 -- show (movimientoDiagonal (Rey, Blanca, Coord F1 CA))
-movimientoDiagonal :: FichaTablero -> [FichaTablero]
-movimientoDiagonal (uni, color, Coord f c) =
+movimientoDiagonal :: FichaTablero -> [GameAction]
+movimientoDiagonal ft@(uni, color, Coord f c) =
   izqAba ++ izqArr ++ derAba ++ derArr
   where
-    izqAba = [(uni, color, Coord (pred f) (pred c)) | f > F1, c > CA]
-    izqArr = [(uni, color, Coord (pred f) (succ c)) | f > F1, c < CH]
-    derAba = [(uni, color, Coord (succ f) (pred c)) | f < F8, c > CA]
-    derArr = [(uni, color, Coord (succ f) (succ c)) | f < F8, c < CH]
+    izqArr = [Move ft (Coord (pred f) (pred c)) | f > F1, c > CA]
+    izqAba = [Move ft (Coord (pred f) (succ c)) | f > F1, c < CH]
+    derArr = [Move ft (Coord (succ f) (pred c)) | f < F8, c > CA]
+    derAba = [Move ft (Coord (succ f) (succ c)) | f < F8, c < CH]
 
-
--- show (movimientoCruz (Rey, Blanca, Coord F1 CA))
-movimientoCruz :: FichaTablero -> [FichaTablero]
-movimientoCruz (uni, color, Coord f c) =
+-- show (movimientoOrtogonal (Rey, Blanca, Coord F1 CA))
+movimientoOrtogonal :: FichaTablero -> [GameAction]
+movimientoOrtogonal ft@(uni, color, Coord f c) =
   izq ++ der ++ aba ++ arr
   where
-    izq = [(uni, color, Coord (f) (pred c)) | c > CA]
-    der = [(uni, color, Coord (f) (succ c)) | c < CH]
-    aba = [(uni, color, Coord (pred f) (c)) | f > F1]
-    arr = [(uni, color, Coord (succ f) (c)) | f < F8]
+    izq = [Move ft (Coord f (pred c)) | c > CA]
+    der = [Move ft (Coord f (succ c)) | c < CH]
+    arr = [Move ft (Coord (pred f) c) | f > F1]
+    aba = [Move ft (Coord (succ f) c) | f < F8]
+
+-- show (movimientoCarga (Rey, Blanca, Coord F1 CA))
+movimientoCarga :: FichaTablero -> [GameAction]
+movimientoCarga ft@(uni, Negra, Coord f c) = [Move ft (Coord (succ (succ f)) c) | f <= F6]
+movimientoCarga ft@(uni, Blanca, Coord f c) = [Move ft (Coord (pred (pred f)) c) | f >= F2]
+
+movimientosPosibles :: GameState -> FichaTablero -> [GameAction]
+movimientosPosibles (GameState tablero _ _ puntos _) ft@(uni, color, coord) =
+  ortogonales ++ diagonales  -- TODO cargas
+  where
+    ortogonales = [mov | mov@(Move _ coord) <- movimientoOrtogonal ft, puntos >= 2, puedeIr tablero (uni,color) coord]
+    diagonales  = [mov | mov@(Move _ coord) <- movimientoDiagonal ft,  puntos >= 3, puedeIr tablero (uni,color) coord]
 
 -- ----------------------------------------------------------------------------------
 
@@ -251,27 +266,19 @@ activePlayer gs = case status gs of
   -- data GameState = GameState Tablero Int Player (Int,Int)                      deriving (Eq) --TODO
   -- data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada | Pasar    deriving (Eq) --TODO
 
+--  movimientosPosibles :: GameState -> FichaTablero -> [GameAction]
+-- dado player, devolver fichas en el tablero de ese player
+
 actions :: GameState -> Player -> [GameAction]
-actions (GameState tablero _ _ _) player = error "actions has not been implemented!" --TODO
-  -- let fichas = [(uni,col,coord) | (uni,col,coord) <- tablero, col==color]
-      -- map (\f -> movimiento f  ) fichas
-
--- ficha, primer dado, segundo dado, tablero
--- estoy en una carga o no?
-
--- movimiento :: FichaTablero -> (Int,Int) -> Tablero -> [GameAction]
--- movimiento (uni, col, coord) dados tablero = case estoyEncarga dados of
-  -- True ->
-    -- let puntos = (fst dados) * 2
-  -- False -> []
-
+actions (GameState tablero _ _ _ _) player = error "actions has not been implemented!" --TODO
+-- filter map concac
 
 nextState :: GameState -> Player -> GameAction -> GameState
 nextState _ _ _ = error "nextState has not been implemented!" --TODO
 
 isFinished :: GameState -> Bool
-isFinished (GameState _ 30 _ _ ) = True
-isFinished (GameState tablero _ _ _ ) = length [u | (u,col,coor)<-tablero,u==Rey] /= 2 --Si no están los dos reyes el juego terminó
+isFinished (GameState _ 30 _ _ _) = True
+isFinished (GameState tablero _ _ _ _) = length [u | (u,col,coor)<-tablero,u==Rey] /= 2 --Si no están los dos reyes el juego terminó
 
 score :: GameState -> Player -> Maybe Int
 score _ _ = error "score has not been implemented!" --TODO
