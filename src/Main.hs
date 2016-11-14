@@ -6,10 +6,10 @@ import Control.Arrow ((&&&))
 import System.Random
 
 data Player = PlayerWhite | PlayerBlack                                      deriving (Eq, Show, Enum)
-data GameStatus = Turn Player | Roll Player | Finished                       deriving (Eq, Show)
+data GameStatus = Turn Player | Roll Player | Skip Player | Finished         deriving (Eq, Show)
 -- Tablero, NroTurno,JugadorActivo, sumaDados, cargaHabilitada
 data GameState = GameState Tablero Int Player Int Bool                      deriving (Eq) --TODO
-data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada | Pasar    deriving (Eq) --TODO
+data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada    deriving (Eq) --TODO
 
 data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Eq,Ord,Enum, Show)
 data Col = CA | CB | CC | CD | CE | CF | CG | CH                             deriving (Eq,Ord,Enum, Show)
@@ -214,8 +214,9 @@ crearTableroCompleto (ficha:xs) t =
 
 
 -- nuestas logicas ------------------------------------------------------------------------------------
-estoyEncarga :: (Int,Int) -> Bool
-estoyEncarga (a,b) = a==b
+-- NO se usa
+-- estoyEncarga :: (Int,Int) -> Bool
+-- estoyEncarga (a,b) = a==b
 
 -- show (movimientoDiagonal (Rey, Blanca, Coord F1 CA))
 movimientoDiagonal :: FichaTablero -> [GameAction]
@@ -243,13 +244,19 @@ movimientoCarga ft@(uni, Negra, Coord f c) = [Move ft (Coord (succ (succ f)) c) 
 movimientoCarga ft@(uni, Blanca, Coord f c) = [Move ft (Coord (pred (pred f)) c) | f >= F2]
 
 movimientosPosibles :: GameState -> FichaTablero -> [GameAction]
-movimientosPosibles (GameState tablero _ _ puntos _) ft@(uni, color, coord) =
-  ortogonales ++ diagonales  -- TODO cargas
+movimientosPosibles (GameState tablero _ _ puntos carga) ft@(uni, color, coord) =
+  ortogonales ++ diagonales ++ cargas
   where
     ortogonales = [mov | mov@(Move _ coord) <- movimientoOrtogonal ft, puntos >= 2, puedeIr tablero (uni,color) coord]
     diagonales  = [mov | mov@(Move _ coord) <- movimientoDiagonal ft,  puntos >= 3, puedeIr tablero (uni,color) coord]
+    cargas = [mov | mov@(Move _ coord) <- movimientoCarga ft, carga, puedeIr tablero (uni,color) coord]
 
--- ----------------------------------------------------------------------------------
+-- dado un tablero y un jugador, devuelve todas sus fichas
+fichasDelJugador :: Tablero -> Player -> [FichaTablero]
+fichasDelJugador tablero p = case p of
+  PlayerWhite -> [fichas | fichas@(unidad,color,coord) <- tablero, color==Blanca]
+  PlayerBlack -> [fichas | fichas@(unidad,color,coord) <- tablero, color==Negra]
+------------------------------------------------------------------------------------
 
 startState :: (Int, Int) -> GameState
 startState _ = error "startState has not been implemented!" --TODO
@@ -263,18 +270,19 @@ activePlayer gs = case status gs of
   Roll player -> Just player
   Finished -> Nothing
 
-  -- data GameState = GameState Tablero Int Player (Int,Int)                      deriving (Eq) --TODO
-  -- data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada | Pasar    deriving (Eq) --TODO
-
---  movimientosPosibles :: GameState -> FichaTablero -> [GameAction]
--- dado player, devolver fichas en el tablero de ese player
-
 actions :: GameState -> Player -> [GameAction]
-actions (GameState tablero _ _ _ _) player = error "actions has not been implemented!" --TODO
--- filter map concac
+actions gs@(GameState tablero _ _ _ _) player = concatMap (movimientosPosibles gs) (fichasDelJugador tablero player)  --error "actions has not been implemented!" --TODO
 
+-- nextState _ _ _ = error "score has not been implemented!" --TODO
 nextState :: GameState -> Player -> GameAction -> GameState
-nextState _ _ _ = error "nextState has not been implemented!" --TODO
+nextState (GameState t i p puntos carga) player action =
+  case action of
+    (DiceRoll d1 d2) -> do
+      let esCarga = d1 == d2
+      let suma = if (esCarga) then (d1+d2)*2 else (d1+d2) 
+      PlayerWhite -> GameState t (i+1) PlayerBlack 0 False
+      PlayerBlack -> GameState t (i+1) PlayerWhite 0 False
+
 
 isFinished :: GameState -> Bool
 isFinished (GameState _ 30 _ _ _) = True
@@ -314,6 +322,11 @@ runMatch ags@(agWhite, agBlack) g r = do
       (Turn p) -> do
          move <- (if p == PlayerWhite then agWhite else agBlack) g
          runMatch ags (nextState g p move) r
+      -- (Skip p) -> do
+      --   let ((d1, d2), r2) = roll2Dice r
+      --   move <- (if p == PlayerWhite then agWhite else agBlack) g
+      --   runMatch ags (nextState g p (DiceRoll d1 d2)) r2
+
 
 runOnConsole :: IO (Int, Int)
 runOnConsole = do
