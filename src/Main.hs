@@ -2,14 +2,15 @@ module Main where
 
 import Data.List (intercalate)
 import Data.Maybe
+import Data.Char
 import Control.Arrow ((&&&))
 import System.Random
 
 data Player = PlayerWhite | PlayerBlack                                      deriving (Eq, Show, Enum)
 data GameStatus = Turn Player | Roll Player | Finished                       deriving (Eq, Show)
 -- Tablero, NroTurno,JugadorActivo, sumaDados, cargaHabilitada
-data GameState = GameState Tablero Int Player Int Bool                       deriving (Eq) --TODO
-data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada | Skip     deriving (Eq) --TODO
+data GameState = GameState Tablero Int Player Int Bool                       deriving (Eq)
+data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada | Skip     deriving (Eq)
 
 data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Eq,Ord,Enum, Show)
 data Col = CA | CB | CC | CD | CE | CF | CG | CH                             deriving (Eq,Ord,Enum, Show)
@@ -106,6 +107,17 @@ strAFicha 'M' = (Mago,Blanca)
 strAFicha 'm' = (Mago,Negra)
 strAFicha 'R' = (Rey,Blanca)
 strAFicha 'r' = (Rey,Negra)
+
+
+fila :: Char -> Fil
+fila x = if (x > '0') && ( x < '9') then
+  [F1 , F2 , F3 , F4 , F5 , F6 , F7 , F8]!!(ord x -49) else
+    error "fila no válida "
+
+columna :: Char -> Col
+columna x = if x > '`' && x<'i' then
+  [CA , CB , CC , CD , CE , CF , CG , CH]!!(ord x -97) else
+    error "columna no válida"
 
 
 fichaMaybeStr :: Maybe Ficha -> Char
@@ -281,15 +293,15 @@ startState :: (Int, Int) -> IO GameState
 startState (d1,d2) = do
   let carga = d1 == d2
   let suma = if (carga) then (d1+d2)*2 else (d1+d2)
-  tablero <- crearTableroCompleto todasLasUnidades []       -- TODO CAMBIAR por tablerGenerado aleatorio
-  return (GameState tablero 0 PlayerWhite suma carga)                 -- error "startState has not been implemented!" --TODO
+  tablero <- crearTableroCompleto todasLasUnidades []
+  return (GameState tablero 0 PlayerWhite suma carga)
 
 -- verificar el costo minimo de las actions
-status :: GameState -> GameStatus                                 --  --error "no sabemos bien que va aca y no tengo tildes" --TODO
+status :: GameState -> GameStatus
 status gs@(GameState t numTurno p puntos carga ) =
   if isFinished gs then Finished
   else if (puntos > 2) then Turn p
-    else Roll (otroPlayer p)                       -- TODO hacer fucnion tengoPuntosSuficientes
+    else Roll (otroPlayer p)
 
 otroPlayer :: Player -> Player
 otroPlayer p = if p == PlayerWhite then PlayerBlack else PlayerWhite
@@ -314,7 +326,7 @@ activePlayer gs = case status gs of
 actions :: GameState -> Player -> [GameAction]
 actions gs@(GameState tablero _ p _ _) player = if (p == player) then concatMap (movimientosPosibles gs) (fichasDelJugador tablero player) else []
 
--- nextState _ _ _ = error "score has not been implemented!" --TODO
+
 nextState :: GameState -> Player -> GameAction -> GameState
 nextState (GameState t i p puntos carga) player action = case action of
   Skip ->
@@ -333,7 +345,7 @@ isFinished (GameState _ 30 _ _ _) = True
 isFinished (GameState tablero _ _ _ _) = length [u | (u,col,coor)<-tablero,u==Rey] /= 2 --Si no están los dos reyes el juego terminó
 
 score :: GameState -> Player -> Maybe Int
-score _ _ = Just 0 -- error "score has not been implemented!" --TODO
+score _ _ = Just 0  -- TODO
 
 -- Presentation ------------------------------------------------------------------------------------
 
@@ -344,22 +356,20 @@ instance Show GameState where
                                           ++ "Carga: "++ show carga ++ "\n"
                                           ++ showBoard t
 
-     -- error "(Show GameState) has not been implemented!" --TODO
+
 
 instance Show GameAction where
   show (DiceRoll d1 d2) = "DiceRoll: " ++ show d1 ++ show d2
   show (Move ft c) = "Move: " ++ show ft ++ show c
   show (Skip) = "Skip"
 
---hacer nuestra readAction que reciba un string y que
--- Move
--- Skip
 readAction :: String -> Maybe GameAction
-readAction txt@([u,c,x,y,z,w]) = do
-  let desde = Coord F1 CA  -- todo a b
-  let hacia = Coord F1 CA  -- todo c d
-  let ft = (Rey,Blanca, Coord F1 CA )
-  Just (Move ft (Coord F1 CA))
+readAction txt@[u,x,y,z,w] = do
+  let desde = Coord (fila x) (columna y)
+  let hacia = Coord (fila z) (columna w)
+  let (unidad, color) = strAFicha u
+  let ft = (unidad,color,desde)
+  Just (Move ft hacia)
 readAction "" = Just Skip
 readAction _ = Nothing
 
@@ -371,7 +381,11 @@ consoleAgent :: Player -> Agent
 consoleAgent p = \gs -> do
   linea <- getLine
   case (readAction linea) of
-    Just act -> return act
+    Just act@(Move ft@(_,c,_) _) ->
+      if ((c == Blanca && p == PlayerWhite ) || (c == Negra && p == PlayerBlack)) then
+        return act
+      else consoleAgent p gs
+    Just Skip -> return Skip
     Nothing -> consoleAgent p gs
 
 --
