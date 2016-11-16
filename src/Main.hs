@@ -6,10 +6,10 @@ import Control.Arrow ((&&&))
 import System.Random
 
 data Player = PlayerWhite | PlayerBlack                                      deriving (Eq, Show, Enum)
-data GameStatus = Turn Player | Roll Player | Skip Player | Finished         deriving (Eq, Show)
+data GameStatus = Turn Player | Roll Player | Finished                       deriving (Eq, Show)
 -- Tablero, NroTurno,JugadorActivo, sumaDados, cargaHabilitada
-data GameState = GameState Tablero Int Player Int Bool                      deriving (Eq) --TODO
-data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada    deriving (Eq) --TODO
+data GameState = GameState Tablero Int Player Int Bool                       deriving (Eq) --TODO
+data GameAction = DiceRoll Int Int | Move FichaTablero Coordenada | Skip     deriving (Eq) --TODO
 
 data Fil = F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8                             deriving (Eq,Ord,Enum, Show)
 data Col = CA | CB | CC | CD | CE | CF | CG | CH                             deriving (Eq,Ord,Enum, Show)
@@ -212,11 +212,11 @@ crearTableroCompleto (ficha:xs) t =
     tablero <- posicionarFichaRandomico ficha t
     crearTableroCompleto xs tablero
 
+-- la que voy a mover, a donde voy a mover, tableroViejo
+moverFicha :: FichaTablero -> Coordenada -> Tablero -> Tablero
+moverFicha ft@(uni,color,coord) destino t = (uni,color,destino) : [ficha | ficha@(uniEnT,colEnT,coordEnT) <- t, ficha /= ft, coordEnT/=destino]
 
 -- nuestas logicas ------------------------------------------------------------------------------------
--- NO se usa
--- estoyEncarga :: (Int,Int) -> Bool
--- estoyEncarga (a,b) = a==b
 
 -- show (movimientoDiagonal (Rey, Blanca, Coord F1 CA))
 movimientoDiagonal :: FichaTablero -> [GameAction]
@@ -258,56 +258,104 @@ fichasDelJugador tablero p = case p of
   PlayerBlack -> [fichas | fichas@(unidad,color,coord) <- tablero, color==Negra]
 ------------------------------------------------------------------------------------
 
-startState :: (Int, Int) -> GameState
-startState _ = error "startState has not been implemented!" --TODO
+startState :: (Int, Int) -> IO GameState
+startState (d1,d2) = do
+  let carga = d1 == d2
+  let suma = if (carga) then (d1+d2)*2 else (d1+d2)
+  tablero <- crearTableroCompleto todasLasUnidades []       -- TODO CAMBIAR por tablerGenerado aleatorio
+  return (GameState tablero 0 PlayerWhite suma carga)                 -- error "startState has not been implemented!" --TODO
 
-status :: GameState -> GameStatus
-status gs = if isFinished gs then Finished else error "no sabemos bien que va aca y no tengo tildes" --TODO
+-- verificar el costo minimo de las actions
+status :: GameState -> GameStatus                                 --  --error "no sabemos bien que va aca y no tengo tildes" --TODO
+status gs@(GameState t numTurno p puntos carga ) =
+  if isFinished gs then Finished
+  else if (puntos > 2) then Turn p
+    else Roll (otroPlayer p)                       -- TODO hacer fucnion tengoPuntosSuficientes
 
+otroPlayer :: Player -> Player
+otroPlayer p = if p == PlayerWhite then PlayerBlack else PlayerWhite
+
+
+costoMovimiento :: GameAction -> Int
+costoMovimiento (Move ft@(uni,col,Coord f c) (Coord fdest cdest)) =
+  if (f/=fdest && c/=cdest) then 3
+    else if (abs(fromEnum fdest - fromEnum f) == 2 ) then 4
+      else 2
+costoMovimiento _ = 0
+
+-- porque GameState
 activePlayer :: GameState -> Maybe Player
 activePlayer gs = case status gs of
   Turn player -> Just player
   Roll player -> Just player
   Finished -> Nothing
 
+-- El que esta adentro de GameState es el activo
+-- el que me pasan es para el que estan preguntando las actions
 actions :: GameState -> Player -> [GameAction]
-actions gs@(GameState tablero _ _ _ _) player = concatMap (movimientosPosibles gs) (fichasDelJugador tablero player)  --error "actions has not been implemented!" --TODO
+actions gs@(GameState tablero _ p _ _) player = if (p == player) then concatMap (movimientosPosibles gs) (fichasDelJugador tablero player) else []
 
 -- nextState _ _ _ = error "score has not been implemented!" --TODO
 nextState :: GameState -> Player -> GameAction -> GameState
-nextState (GameState t i p puntos carga) player action =
-  case action of
-    (DiceRoll d1 d2) -> do
-      let esCarga = d1 == d2
-      let suma = if (esCarga) then (d1+d2)*2 else (d1+d2) 
-      PlayerWhite -> GameState t (i+1) PlayerBlack 0 False
-      PlayerBlack -> GameState t (i+1) PlayerWhite 0 False
-
+nextState (GameState t i p puntos carga) player action = case action of
+  Skip ->
+    GameState t (i+1) p 0 carga
+  (DiceRoll d1 d2) ->
+    let esCarga = d1 == d2 in
+      let suma = if (esCarga) then (d1+d2)*2 else (d1+d2) in
+        GameState t (i+1) p 0 carga
+  (Move ft coord) ->  -- bajar puntos, quitar del tablero la ficha ft, ponerla en coord
+    let tableroNuevo = moverFicha ft coord t in
+      let puntosNuevo = puntos - costoMovimiento action in
+        GameState tableroNuevo (i+1) p puntosNuevo carga
 
 isFinished :: GameState -> Bool
 isFinished (GameState _ 30 _ _ _) = True
 isFinished (GameState tablero _ _ _ _) = length [u | (u,col,coor)<-tablero,u==Rey] /= 2 --Si no están los dos reyes el juego terminó
 
 score :: GameState -> Player -> Maybe Int
-score _ _ = error "score has not been implemented!" --TODO
+score _ _ = Just 0 -- error "score has not been implemented!" --TODO
 
 -- Presentation ------------------------------------------------------------------------------------
 
 instance Show GameState where
-   show _ = error "(Show GameState) has not been implemented!" --TODO
+   show (GameState t turno p puntos carga) = "Turno: "++ show turno ++ "\n"
+                                          ++ "Jugador: "++ show p ++ "\n"
+                                          ++ "Puntos: "++ show puntos ++"\n"
+                                          ++ "Carga: "++ show carga ++ "\n"
+                                          ++ showBoard t
+
+     -- error "(Show GameState) has not been implemented!" --TODO
 
 instance Show GameAction where
-   show _ = error "(Show GameAction) has not been implemented!" --TODO
+  show (DiceRoll d1 d2) = "DiceRoll: " ++ show d1 ++ show d2
+  show (Move ft c) = "Move: " ++ show ft ++ show c
+  show (Skip) = "Skip"
 
-instance Read GameAction where
-   readsPrec _ = error "(Read GameAction) has not been implemented!" --TODO
+--hacer nuestra readAction que reciba un string y que
+-- Move
+-- Skip
+readAction :: String -> Maybe GameAction
+readAction txt@([u,c,x,y,z,w]) = do
+  let desde = Coord F1 CA  -- todo a b
+  let hacia = Coord F1 CA  -- todo c d
+  let ft = (Rey,Blanca, Coord F1 CA )
+  Just (Move ft (Coord F1 CA))
+readAction "" = Just Skip
+readAction _ = Nothing
 
 -- Match controller --------------------------------------------------------------------------------
 type Agent = GameState -> IO GameAction
 
+-- controlar que acciones puede hacer, llamar recursivo
 consoleAgent :: Player -> Agent
-consoleAgent _ _ = error "consoleAgent has not been implemented!"
+consoleAgent p = \gs -> do
+  linea <- getLine
+  case (readAction linea) of
+    Just act -> return act
+    Nothing -> consoleAgent p gs
 
+--
 randomAgent :: Player -> Agent
 randomAgent _ _ = error "consoleAgent has not been implemented!"
 
@@ -322,17 +370,14 @@ runMatch ags@(agWhite, agBlack) g r = do
       (Turn p) -> do
          move <- (if p == PlayerWhite then agWhite else agBlack) g
          runMatch ags (nextState g p move) r
-      -- (Skip p) -> do
-      --   let ((d1, d2), r2) = roll2Dice r
-      --   move <- (if p == PlayerWhite then agWhite else agBlack) g
-      --   runMatch ags (nextState g p (DiceRoll d1 d2)) r2
 
-
+-- pasar
 runOnConsole :: IO (Int, Int)
 runOnConsole = do
    r <- newStdGen
    let (dice, r2) = roll2Dice r
-   runMatch (consoleAgent PlayerWhite, consoleAgent PlayerBlack) (startState dice) r2
+   estado <- startState dice
+   runMatch (consoleAgent PlayerWhite, consoleAgent PlayerBlack) estado r2
 
 -- Utility -----------------------------------------------------------------------------------------
 
