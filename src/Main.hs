@@ -89,6 +89,25 @@ fichaStr (Mago,Negra) = 'm'
 fichaStr (Rey,Blanca) = 'R'
 fichaStr (Rey,Negra) = 'r'
 
+strAFicha :: Char -> Ficha
+strAFicha 'H' = (Hacha, Blanca)
+strAFicha 'h' = (Hacha, Negra)
+strAFicha 'E' = (Espada,Blanca)
+strAFicha 'e' = (Espada,Negra)
+strAFicha 'P' = (Pica,Blanca)
+strAFicha 'p' = (Pica,Negra)
+strAFicha 'C' = (Caballo,Blanca)
+strAFicha 'c' = (Caballo,Negra)
+strAFicha 'A' = (Arco,Blanca)
+strAFicha 'a' = (Arco,Negra)
+strAFicha 'B' = (Bufo,Blanca)
+strAFicha 'b' = (Bufo,Negra)
+strAFicha 'M' = (Mago,Blanca)
+strAFicha 'm' = (Mago,Negra)
+strAFicha 'R' = (Rey,Blanca)
+strAFicha 'r' = (Rey,Negra)
+
+
 fichaMaybeStr :: Maybe Ficha -> Char
 fichaMaybeStr mFicha = case mFicha of
   Just ficha -> fichaStr ficha
