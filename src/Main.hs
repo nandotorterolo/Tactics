@@ -114,9 +114,10 @@ fila x = if (x > '0') && ( x < '9') then
   [F1 , F2 , F3 , F4 , F5 , F6 , F7 , F8]!!(ord x -49) else
     error "fila no válida "
 
+
 columna :: Char -> Col
-columna x = if x > '`' && x<'i' then
-  [CA , CB , CC , CD , CE , CF , CG , CH]!!(ord x -97) else
+columna x = if x > '@' && x<'I' then
+  [CA , CB , CC , CD , CE , CF , CG , CH]!!(ord x -65) else
     error "columna no válida"
 
 
@@ -334,7 +335,8 @@ nextState (GameState t i p puntos carga) player action = case action of
   (DiceRoll d1 d2) ->
     let esCarga = d1 == d2 in
       let suma = if (esCarga) then (d1+d2)*2 else (d1+d2) in
-        GameState t (i+1) p 0 carga
+        GameState t (i+1) player suma esCarga
+
   (Move ft coord) ->  -- bajar puntos, quitar del tablero la ficha ft, ponerla en coord
     let tableroNuevo = moverFicha ft coord t in
       let puntosNuevo = puntos - costoMovimiento action in
