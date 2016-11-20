@@ -23,8 +23,12 @@ type Ficha = (Unidad,Color)
 type FichaTablero = (Unidad,Color,Coordenada)
 type Tablero = [FichaTablero]
 
-main :: IO ()
-main = showIOBoard (crearTableroCompleto todasLasUnidades []) >>= putStr
+-- main :: IO ()
+-- main = showIOBoard (crearTableroCompleto todasLasUnidades []) >>= putStr
+
+main :: IO (Int,Int)
+main = runOnConsole
+
 
 -- Unidades del Juego - 15 fichas
 unidades :: [Unidad]
@@ -172,9 +176,9 @@ estaLibre tablero coord = isNothing (fichaCoordenada tablero coord)
 puedeIr :: Tablero -> Ficha -> Coordenada -> Bool
 puedeIr t ficha c = resultado
   where
-    resultado = case fichaCoordenada t c of
+    resultado = case fichaCoordenada t c of   -- ficha que esta en la coordenada destino c , del tablero t
       Nothing -> True
-      Just f@(uni,col) -> f `elem` colorPierde ficha
+      Just f@(uni,col) -> f `elem` colorGana ficha   -- f=ficha destino, es una ficha a quien le gana la ficha que voy a mover=ficha
 
 -- Dado un tablero y una coordenada devuelve opcionalmente una ficha
 -- En la funcion where se utiliza Arrow &&&, la forma clasico seri la linea de abajo.
@@ -197,9 +201,6 @@ posicionesValidasNegras = [Coord f c | f <- [F1 .. F3], c<- [CA .. CH],  Coord f
 posicionesRey :: Color -> [Coordenada]
 posicionesRey Negra  = [Coord F1 CD, Coord F1 CE, Coord F2 CD, Coord F2 CE]
 posicionesRey Blanca = [Coord F7 CD, Coord F7 CE, Coord F8 CD, Coord F8 CE]
-
--- posicionesReyNegro :: [Coordenada]
--- posicionesReyNegro = [Coord F1 CD, Coord F1 CE, Coord F2 CD, Coord F2 CE]
 
 -- Lista de coordenadas validas al inicio del juego para las blancas
 posicionesValidasBlancasLibres :: Tablero -> [Coordenada]
@@ -327,9 +328,8 @@ activePlayer gs = case status gs of
 actions :: GameState -> Player -> [GameAction]
 actions gs@(GameState tablero _ p _ _) player = if (p == player) then concatMap (movimientosPosibles gs) (fichasDelJugador tablero player) else []
 
-
 nextState :: GameState -> Player -> GameAction -> GameState
-nextState (GameState t i p puntos carga) player action = case action of
+nextState gs@(GameState t i p puntos carga) player action = case action of
   Skip ->
     GameState t (i+1) p 0 carga
   (DiceRoll d1 d2) ->
@@ -338,9 +338,11 @@ nextState (GameState t i p puntos carga) player action = case action of
         GameState t (i+1) player suma esCarga
 
   (Move ft coord) ->  -- bajar puntos, quitar del tablero la ficha ft, ponerla en coord
-    let tableroNuevo = moverFicha ft coord t in
-      let puntosNuevo = puntos - costoMovimiento action in
-        GameState tableroNuevo (i+1) p puntosNuevo carga
+    if action `elem` (actions gs player) then
+      let tableroNuevo = moverFicha ft coord t in
+        let puntosNuevo = puntos - costoMovimiento action in
+          GameState tableroNuevo (i+1) p puntosNuevo carga
+    else GameState t (i) p puntos carga
 
 isFinished :: GameState -> Bool
 isFinished (GameState _ 30 _ _ _) = True
@@ -357,8 +359,6 @@ instance Show GameState where
                                           ++ "Puntos: "++ show puntos ++"\n"
                                           ++ "Carga: "++ show carga ++ "\n"
                                           ++ showBoard t
-
-
 
 instance Show GameAction where
   show (DiceRoll d1 d2) = "DiceRoll: " ++ show d1 ++ show d2
@@ -380,12 +380,17 @@ type Agent = GameState -> IO GameAction
 
 -- controlar que acciones puede hacer, llamar recursivo
 consoleAgent :: Player -> Agent
-consoleAgent p = \gs -> do
+consoleAgent p = \gs@(GameState tablero _ _ _ _) -> do
   linea <- getLine
   case (readAction linea) of
-    Just act@(Move ft@(_,c,_) _) ->
-      if ((c == Blanca && p == PlayerWhite ) || (c == Negra && p == PlayerBlack)) then
-        return act
+    Just act@(Move ft@(u,c,coord) _) ->
+      if ((c == Blanca && p == PlayerWhite ) || (c == Negra && p == PlayerBlack)) then  -- el jugador que mueve, solo puede mover sus fichas
+        let ficha = (fichaCoordenada tablero coord) in
+        if (ficha == Nothing) then consoleAgent p gs       -- la coordenada que quiere mover es vcia
+          else
+            let Just (unidad,_) = ficha in
+            if unidad == u then return act                 -- la coordenada que quiere mover tiene la ficha que dijo
+              else consoleAgent p gs
       else consoleAgent p gs
     Just Skip -> return Skip
     Nothing -> consoleAgent p gs
