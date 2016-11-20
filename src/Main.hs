@@ -294,26 +294,26 @@ fichasDelJugador tablero p = case p of
 startState :: (Int, Int) -> IO GameState
 startState (d1,d2) = do
   let carga = d1 == d2
-  let suma = if (carga) then (d1+d2)*2 else (d1+d2)
+  let suma = if carga then (d1+d2)*2 else d1+d2
   tablero <- crearTableroCompleto todasLasUnidades []
   return (GameState tablero 0 PlayerWhite suma carga)
 
 -- verificar el costo minimo de las actions
 status :: GameState -> GameStatus
-status gs@(GameState t numTurno p puntos carga ) =
-  if isFinished gs then Finished
-  else if (puntos > 2) then Turn p
-    else Roll (otroPlayer p)
+status gs@(GameState t numTurno p puntos carga )
+  | isFinished gs = Finished
+  | puntos > 2 = Turn p
+  | otherwise = Roll (otroPlayer p)
 
 otroPlayer :: Player -> Player
 otroPlayer p = if p == PlayerWhite then PlayerBlack else PlayerWhite
 
 
 costoMovimiento :: GameAction -> Int
-costoMovimiento (Move ft@(uni,col,Coord f c) (Coord fdest cdest)) =
-  if (f/=fdest && c/=cdest) then 3
-    else if (abs(fromEnum fdest - fromEnum f) == 2 ) then 4
-      else 2
+costoMovimiento (Move ft@(uni,col,Coord f c) (Coord fdest cdest))
+  | f/=fdest && c/=cdest = 3
+  | abs(fromEnum fdest - fromEnum f) == 2 = 4
+  | otherwise = 2
 costoMovimiento _ = 0
 
 -- porque GameState
@@ -326,7 +326,7 @@ activePlayer gs = case status gs of
 -- El que esta adentro de GameState es el activo
 -- el que me pasan es para el que estan preguntando las actions
 actions :: GameState -> Player -> [GameAction]
-actions gs@(GameState tablero _ p _ _) player = if (p == player) then concatMap (movimientosPosibles gs) (fichasDelJugador tablero player) else []
+actions gs@(GameState tablero _ p _ _) player = if p == player then concatMap (movimientosPosibles gs) (fichasDelJugador tablero player) else []
 
 nextState :: GameState -> Player -> GameAction -> GameState
 nextState gs@(GameState t i p puntos carga) player action = case action of
@@ -334,15 +334,15 @@ nextState gs@(GameState t i p puntos carga) player action = case action of
     GameState t (i+1) p 0 carga
   (DiceRoll d1 d2) ->
     let esCarga = d1 == d2 in
-      let suma = if (esCarga) then (d1+d2)*2 else (d1+d2) in
+      let suma = if esCarga then (d1+d2)*2 else d1+d2 in
         GameState t (i+1) player suma esCarga
 
   (Move ft coord) ->  -- bajar puntos, quitar del tablero la ficha ft, ponerla en coord
-    if action `elem` (actions gs player) then
+    if action `elem` actions gs player then
       let tableroNuevo = moverFicha ft coord t in
         let puntosNuevo = puntos - costoMovimiento action in
           GameState tableroNuevo (i+1) p puntosNuevo carga
-    else GameState t (i) p puntos carga
+    else GameState t i p puntos carga
 
 isFinished :: GameState -> Bool
 isFinished (GameState _ 30 _ _ _) = True
@@ -363,7 +363,7 @@ instance Show GameState where
 instance Show GameAction where
   show (DiceRoll d1 d2) = "DiceRoll: " ++ show d1 ++ show d2
   show (Move ft c) = "Move: " ++ show ft ++ show c
-  show (Skip) = "Skip"
+  show Skip = "Skip"
 
 readAction :: String -> Maybe GameAction
 readAction txt@[u,x,y,z,w] = do
@@ -380,13 +380,13 @@ type Agent = GameState -> IO GameAction
 
 -- controlar que acciones puede hacer, llamar recursivo
 consoleAgent :: Player -> Agent
-consoleAgent p = \gs@(GameState tablero _ _ _ _) -> do
+consoleAgent p gs@(GameState tablero _ _ _ _) = do
   linea <- getLine
-  case (readAction linea) of
+  case readAction linea of
     Just act@(Move ft@(u,c,coord) _) ->
-      if ((c == Blanca && p == PlayerWhite ) || (c == Negra && p == PlayerBlack)) then  -- el jugador que mueve, solo puede mover sus fichas
-        let ficha = (fichaCoordenada tablero coord) in
-        if (ficha == Nothing) then consoleAgent p gs       -- la coordenada que quiere mover es vcia
+      if (c == Blanca && p == PlayerWhite ) || (c == Negra && p == PlayerBlack) then  -- el jugador que mueve, solo puede mover sus fichas
+        let ficha = fichaCoordenada tablero coord in
+        if isNothing ficha then consoleAgent p gs       -- la coordenada que quiere mover es vcia
           else
             let Just (unidad,_) = ficha in
             if unidad == u then return act                 -- la coordenada que quiere mover tiene la ficha que dijo
@@ -402,7 +402,7 @@ randomAgent _ _ = error "consoleAgent has not been implemented!"
 runMatch :: RandomGen r => (Agent, Agent) -> GameState -> r -> IO (Int, Int)
 runMatch ags@(agWhite, agBlack) g r = do
    putStrLn (show g)
-   case (status g) of
+   case status g of
       Finished -> return (fromJust (score g PlayerWhite), fromJust (score g PlayerBlack))
       (Roll p) -> do
          let ((d1, d2), r2) = roll2Dice r
