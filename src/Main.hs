@@ -37,25 +37,25 @@ unidades = [Hacha, Espada, Pica, Caballo, Arco, Bufo, Mago, Rey]
 --Devuelve lista de unidades que puede ganarle la una unidad dada
 gana :: Unidad -> [Unidad]
 gana uni = case uni of
-  Hacha -> [Arco, Bufo, Mago]
-  Espada -> [Hacha, Bufo, Mago]
-  Pica -> [Hacha, Espada, Caballo]
-  Caballo -> [Hacha, Espada, Arco]
-  Arco -> [Espada, Pica, Bufo]
-  Bufo -> [Pica, Caballo, Mago]
-  Mago -> [Pica, Caballo, Arco]
+  Hacha -> [Arco, Bufo, Mago, Rey]
+  Espada -> [Hacha, Bufo, Mago, Rey]
+  Pica -> [Hacha, Espada, Caballo, Rey]
+  Caballo -> [Hacha, Espada, Arco, Rey]
+  Arco -> [Espada, Pica, Bufo, Rey]
+  Bufo -> [Pica, Caballo, Mago, Rey]
+  Mago -> [Pica, Caballo, Arco, Rey]
   _ -> unidades --rey
 
 --Devuelve lista de unidades que puede perder la una unidad dada
 pierde :: Unidad -> [Unidad]
 pierde uni = case uni of
-  Hacha -> [Espada, Pica, Caballo]
-  Espada -> [Pica, Caballo, Arco]
-  Pica -> [Arco, Bufo, Mago]
-  Caballo -> [Pica, Bufo, Mago]
-  Arco -> [Hacha,Caballo, Mago]
-  Bufo -> [Hacha,Espada, Arco]
-  Mago -> [Hacha, Espada, Arco]
+  Hacha -> [Espada, Pica, Caballo, Rey]
+  Espada -> [Pica, Caballo, Arco, Rey]
+  Pica -> [Arco, Bufo, Mago, Rey]
+  Caballo -> [Pica, Bufo, Mago, Rey]
+  Arco -> [Hacha,Caballo, Mago, Rey]
+  Bufo -> [Hacha,Espada, Arco, Rey]
+  Mago -> [Hacha, Espada, Arco, Rey]
   _ -> unidades --rey
 
 colorGana :: Ficha -> [Ficha]
@@ -345,7 +345,7 @@ nextState gs@(GameState t i p puntos carga) player action = case action of
     else GameState t i p puntos carga
 
 isFinished :: GameState -> Bool
-isFinished (GameState _ 30 _ _ _) = True
+isFinished (GameState _ 60 _ _ _) = True
 isFinished (GameState tablero _ _ _ _) = length [u | (u,col,coor)<-tablero,u==Rey] /= 2 --Si no están los dos reyes el juego terminó
 
 score :: GameState -> Player -> Maybe Int
@@ -397,7 +397,10 @@ consoleAgent p gs@(GameState tablero _ _ _ _) = do
 
 --
 randomAgent :: Player -> Agent
-randomAgent _ _ = error "consoleAgent has not been implemented!"
+randomAgent p gs = do
+  r <- newStdGen
+  let moves = actions gs p
+  return (moves !! fst (randomR (0, (length moves) - 1) r))
 
 runMatch :: RandomGen r => (Agent, Agent) -> GameState -> r -> IO (Int, Int)
 runMatch ags@(agWhite, agBlack) g r = do
@@ -417,7 +420,7 @@ runOnConsole = do
    r <- newStdGen
    let (dice, r2) = roll2Dice r
    estado <- startState dice
-   runMatch (consoleAgent PlayerWhite, consoleAgent PlayerBlack) estado r2
+   runMatch (randomAgent PlayerWhite, randomAgent PlayerBlack) estado r2
 
 -- Utility -----------------------------------------------------------------------------------------
 
