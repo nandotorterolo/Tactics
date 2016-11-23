@@ -420,7 +420,7 @@ runOnConsole = do
    r <- newStdGen
    let (dice, r2) = roll2Dice r
    estado <- startState dice
-   runMatch (randomAgent PlayerWhite, randomAgent PlayerBlack) estado r2
+   runMatch (consoleAgent PlayerWhite, randomAgent PlayerBlack) estado r2
 
 -- Utility -----------------------------------------------------------------------------------------
 
